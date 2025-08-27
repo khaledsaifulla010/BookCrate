@@ -1,9 +1,26 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router-dom";
+import App from "../App";
 import Home from "../Pages/Home/Home";
+
+
 const router = createBrowserRouter([
   {
     path: "/",
-    Component: Home,
+    element: <App />,
+    children: [
+      {
+        element: <Home />,
+        children: [
+          { index: true, element: <Navigate to="/books" replace /> },
+          { path: "/books", element: <BooksList /> },
+          { path: "/books/:id", element: <BookDetails /> },
+          { path: "/create-book", element: <BookForm mode="create" /> },
+          { path: "/edit-book/:id", element: <BookForm mode="edit" /> },
+          { path: "/borrow/:bookId", element: <BorrowForm /> },
+          { path: "/borrow-summary", element: <BorrowSummary /> },
+        ],
+      },
+    ],
   },
 ]);
 
