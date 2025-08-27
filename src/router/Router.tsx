@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import App from "../App";
 import Home from "../Pages/Home/Home";
+import BooksList from "../Pages/Books/BooksList";
 
 
 const router = createBrowserRouter([
@@ -13,11 +14,11 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/books" replace /> },
           { path: "/books", element: <BooksList /> },
-          { path: "/books/:id", element: <BookDetails /> },
-          { path: "/create-book", element: <BookForm mode="create" /> },
-          { path: "/edit-book/:id", element: <BookForm mode="edit" /> },
-          { path: "/borrow/:bookId", element: <BorrowForm /> },
-          { path: "/borrow-summary", element: <BorrowSummary /> },
+          // { path: "/books/:id", element: <BookDetails /> },
+          // { path: "/create-book", element: <BookForm mode="create" /> },
+          // { path: "/edit-book/:id", element: <BookForm mode="edit" /> },
+          // { path: "/borrow/:bookId", element: <BorrowForm /> },
+          // { path: "/borrow-summary", element: <BorrowSummary /> },
         ],
       },
     ],

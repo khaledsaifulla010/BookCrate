@@ -1,8 +1,11 @@
-import type { Book, CreateBookInput, Genre, UpdateBookInput } from "../types/book";
+import type {
+  Book,
+  CreateBookInput,
+  Genre,
+  UpdateBookInput,
+} from "../types/book";
 import type { ApiEnvelope } from "../types/response";
 import { baseApi } from "./baseApi";
-
-
 
 type ListParams = {
   filter?: Genre | "";
