@@ -1,11 +1,11 @@
-import "./App.css";
+import { Toaster } from "react-hot-toast";
+import { Outlet } from "react-router-dom";
 
-function App() {
+export default function App() {
   return (
     <>
-      <h1>BookCrate</h1>
+      <Outlet />
+      <Toaster position="top-right" />
     </>
   );
 }
-
-export default App;
