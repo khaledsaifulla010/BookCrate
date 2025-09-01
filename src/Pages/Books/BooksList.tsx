@@ -1,39 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import toast from "react-hot-toast";
-
 import {
   useDeleteBookMutation,
   useGetBooksQuery,
 } from "../../store/api/booksApi";
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-
 import { Button } from "../../components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../components/ui/table";
-
-
-import { Badge } from "../../components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,85 +16,145 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import type { Book, Genre } from "../../store/types/book";
 
+import { useState, useMemo } from "react";
+import type { Genre } from "../../store/types/book";
+import { ArrowUpDown, Plus, Trash2, Pencil, Eye, Hand } from "lucide-react";
+import toast from "react-hot-toast";
 
-const GENRES: Genre[] = [
-  "FICTION",
-  "NON_FICTION",
-  "SCIENCE",
-  "HISTORY",
-  "BIOGRAPHY",
-  "FANTASY",
-];
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
+
+import { Badge } from "../../components/ui/badge";
+import { Input } from "../../components/ui/input";
 
 export default function BooksList() {
-  const [filter, setFilter] = useState<Genre | "">("");
-  const [limit, setLimit] = useState<number>(50);
+  const [genre, setGenre] = useState<Genre | "ALL">("ALL");
+  const [sortBy, setSortBy] = useState<"createdAt" | "title" | "author">(
+    "createdAt"
+  );
+  const [sort, setSort] = useState<"asc" | "desc">("desc");
+  const [limit, setLimit] = useState<number>(20);
+  const [search, setSearch] = useState("");
 
   const {
-    data: books = [],
+    data = [],
     isLoading,
     isError,
     refetch,
   } = useGetBooksQuery({
-    filter: filter || undefined,
-    sortBy: "createdAt",
-    sort: "desc",
+    filter: genre === "ALL" ? undefined : genre,
+    sortBy,
+    sort,
     limit,
-  }) as {
-    data: Book[];
-    isLoading: boolean;
-    isError: boolean;
-    refetch: () => void;
-  };
+  });
 
-  const [deleteBook, { isLoading: isDeleting }] = useDeleteBookMutation();
   const navigate = useNavigate();
+  const [deleteBook] = useDeleteBookMutation();
 
-  const onDelete = async (id: string, title: string) => {
+  const filtered = useMemo(() => {
+    if (!search.trim()) return data;
+    const q = search.toLowerCase();
+    return data.filter(
+      (b) =>
+        b.title.toLowerCase().includes(q) ||
+        b.author.toLowerCase().includes(q) ||
+        b.isbn.toLowerCase().includes(q)
+    );
+  }, [data, search]);
+
+  if (isLoading) return <div>Loading books...</div>;
+  if (isError) return <div className="text-red-600">Failed to load books.</div>;
+
+  const doDelete = async (id: string) => {
+    const p = deleteBook(id).unwrap();
+    toast.promise(p, {
+      loading: "Deleting book...",
+      success: "Book deleted",
+      error: "Delete failed",
+    });
     try {
-      await deleteBook(id).unwrap();
-      toast.success(`Deleted "${title}"`);
-    } catch (err: unknown) {
-      if (typeof err === "object" && err && "data" in err) {
-        toast.error(
-          (err as { data?: { message?: string } }).data?.message ||
-            "Failed to delete"
-        );
-      } else {
-        toast.error("Failed to delete");
-      }
+      await p;
+    } finally {
+      refetch();
     }
   };
 
   return (
-    <section className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Books</h1>
-        <div className="flex items-center gap-2">
+    <section className="space-y-5">
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <div className="text-2xl font-semibold">Books</div>
+        <div className="flex flex-1 md:flex-none gap-2">
+          {/* Search */}
+          <Input
+            placeholder="Search by title, author, ISBN"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="md:w-72"
+          />
+
           {/* Genre Filter */}
           <Select
-            value={filter || undefined} // undefined means nothing selected
-            onValueChange={(val) => setFilter(val as Genre)}
+            value={genre}
+            onValueChange={(v) => setGenre(v as Genre | "ALL")}
           >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="All Genres" />
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="All genres" />
             </SelectTrigger>
             <SelectContent>
-              {GENRES.map((g) => (
-                <SelectItem key={g} value={g}>
-                  {g.replace("_", " ")}
-                </SelectItem>
-              ))}
+              <SelectItem value="ALL">All genres</SelectItem>
+              <SelectItem value="FICTION">Fiction</SelectItem>
+              <SelectItem value="NON_FICTION">Non-fiction</SelectItem>
+              <SelectItem value="SCIENCE">Science</SelectItem>
+              <SelectItem value="HISTORY">History</SelectItem>
+              <SelectItem value="BIOGRAPHY">Biography</SelectItem>
+              <SelectItem value="FANTASY">Fantasy</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Sort Order */}
+          <Button
+            variant="secondary"
+            onClick={() => setSort((s) => (s === "asc" ? "desc" : "asc"))}
+            className="gap-2"
+            title="Toggle sort order"
+          >
+            <ArrowUpDown size={16} /> {sort.toUpperCase()}
+          </Button>
+
+          {/* Sort By */}
+          <Select
+            value={sortBy}
+            onValueChange={(v) => setSortBy(v as typeof sortBy)}
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="createdAt">Created</SelectItem>
+              <SelectItem value="title">Title</SelectItem>
+              <SelectItem value="author">Author</SelectItem>
             </SelectContent>
           </Select>
 
           {/* Limit */}
           <Select
             value={String(limit)}
-            onValueChange={(val) => setLimit(Number(val))}
+            onValueChange={(v) => setLimit(Number(v))}
           >
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Limit" />
@@ -131,134 +162,117 @@ export default function BooksList() {
             <SelectContent>
               {[10, 20, 50, 100].map((n) => (
                 <SelectItem key={n} value={String(n)}>
-                  Limit: {n}
+                  {n}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Button variant="secondary" onClick={() => refetch()}>
-            Refresh
+          {/* Add Book */}
+          <Button className="gap-2" onClick={() => navigate("/create-book")}>
+            <Plus size={16} /> Add Book
           </Button>
-          <Button onClick={() => navigate("/create-book")}>Add Book</Button>
         </div>
       </div>
 
       {/* Books Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Books</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Author</TableHead>
-                  <TableHead>Genre</TableHead>
-                  <TableHead>ISBN</TableHead>
-                  <TableHead>Copies</TableHead>
-                  <TableHead>Availability</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6">
-                      Loading...
-                    </TableCell>
-                  </TableRow>
-                )}
-                {isError && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="text-center py-6 text-red-600"
-                    >
-                      Failed to load books.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!isLoading && books.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6">
-                      No books found.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {books.map((b: Book) => (
-                  <TableRow key={b._id}>
-                    <TableCell>
-                      <Link
-                        className="underline underline-offset-2"
-                        to={`/books/${b._id}`}
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Author</TableHead>
+              <TableHead>Genre</TableHead>
+              <TableHead>ISBN</TableHead>
+              <TableHead>Copies</TableHead>
+              <TableHead>Availability</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((b) => (
+              <TableRow key={b._id}>
+                <TableCell className="font-medium">{b.title}</TableCell>
+                <TableCell>{b.author}</TableCell>
+                <TableCell>{b.genre.replace("_", " ")}</TableCell>
+                <TableCell>{b.isbn}</TableCell>
+                <TableCell>{b.copies}</TableCell>
+                <TableCell>
+                  {b.available && b.copies > 0 ? (
+                    <Badge className="bg-green-600/90">Available</Badge>
+                  ) : (
+                    <Badge variant="destructive">Unavailable</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Link to={`/books/${b._id}`}>
+                      <Button variant="ghost" size="icon" title="View">
+                        <Eye size={18} />
+                      </Button>
+                    </Link>
+                    <Link to={`/edit-book/${b._id}`}>
+                      <Button variant="ghost" size="icon" title="Edit">
+                        <Pencil size={18} />
+                      </Button>
+                    </Link>
+                    <Link to={`/borrow/${b._id}`}>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        title="Borrow"
+                        disabled={!b.available || b.copies === 0}
                       >
-                        {b.title}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{b.author}</TableCell>
-                    <TableCell>{b.genre.replace("_", " ")}</TableCell>
-                    <TableCell>{b.isbn}</TableCell>
-                    <TableCell>{b.copies}</TableCell>
-                    <TableCell>
-                      {b.available ? (
-                        <Badge>Available</Badge>
-                      ) : (
-                        <Badge variant="destructive">Unavailable</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={() => navigate(`/edit-book/${b._id}`)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          onClick={() => navigate(`/borrow/${b._id}`)}
-                          disabled={!b.available || b.copies === 0}
-                        >
-                          Borrow
-                        </Button>
+                        <Hand size={18} />
+                      </Button>
+                    </Link>
 
-                        {/* Delete with AlertDialog */}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" disabled={isDeleting}>
+                    {/* Delete confirm */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Delete">
+                          <Trash2 size={18} />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="rounded-lg border bg-card p-6 max-w-sm">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete this book?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel asChild>
+                            <Button variant="secondary">Cancel</Button>
+                          </AlertDialogCancel>
+                          <AlertDialogAction asChild>
+                            <Button
+                              variant="destructive"
+                              onClick={() => doDelete(b._id)}
+                            >
                               Delete
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Book</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete "{b.title}"?
-                                This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => onDelete(b._id, b.title)}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="text-center text-muted-foreground py-10"
+                >
+                  No books found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </section>
   );
 }
