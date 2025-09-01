@@ -7,7 +7,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../../components/ui/button";
-
+import { Badge } from "../../components/ui/badge";
+import CenterSpinner from "../../components/ui/spinner";
 const schema = z.object({
   quantity: z.coerce.number().int().min(1),
   dueDate: z.string().min(1),
@@ -47,54 +48,69 @@ export default function BorrowForm() {
       await p;
       navigate("/borrow-summary");
     } catch {
-      /* toast handles */
+      //
     }
   };
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) return <CenterSpinner label="Loading Book..." />;
   if (isError || !book)
-    return <div className="text-red-600">Book not found.</div>;
+    return (
+      <div className="w-full h-[60vh] grid place-items-center">
+        <div className="text-red-600 text-center">Book not found.</div>
+      </div>
+    );
 
   return (
-    <section className="max-w-xl space-y-6">
+    <section className="max-w-2xl mx-auto space-y-6 ">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Borrow “{book.title}”</h1>
+        <div>
+          <h1 className="text-2xl font-semibold">Borrow “{book.title}”</h1>
+          <p className="text-sm text-muted-foreground">
+            {book.author} •{" "}
+            <span className="uppercase">{book.genre.replace("_", " ")}</span>
+          </p>
+        </div>
         <Link to={`/books/${book._id}`}>
           <Button variant="secondary">Back</Button>
         </Link>
       </div>
 
-      <div className="rounded-lg border bg-card p-5 space-y-4">
-        <div className="text-sm">
-          <div>
-            <span className="font-medium">Author:</span> {book.author}
-          </div>
+      <div className="rounded-xl border bg-card p-5 space-y-5 shadow-sm">
+        <div className="text-sm grid grid-cols-2 gap-2">
           <div>
             <span className="font-medium">ISBN:</span> {book.isbn}
           </div>
           <div>
             <span className="font-medium">Available copies:</span> {book.copies}
           </div>
-          <div>
-            <span className="font-medium">Status:</span>{" "}
-            {book.available && book.copies > 0 ? "Available" : "Unavailable"}
+          <div className="col-span-2 flex items-center gap-2">
+            <span className="font-medium">Status:</span>
+            {book.available && book.copies > 0 ? (
+              <Badge className="bg-emerald-600/90">Available</Badge>
+            ) : (
+              <Badge variant="destructive">Unavailable</Badge>
+            )}
           </div>
         </div>
 
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Quantity</label>
-            <Input
-              type="number"
-              min={1}
-              max={book.copies}
-              {...form.register("quantity", { valueAsNumber: true })}
-            />
-            <p className="text-xs text-muted-foreground">Max: {book.copies}</p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Due Date</label>
-            <Input type="date" {...form.register("dueDate")} />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Quantity</label>
+              <Input
+                type="number"
+                min={1}
+                max={book.copies}
+                {...form.register("quantity", { valueAsNumber: true })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Max: {book.copies}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Due Date</label>
+              <Input type="date" {...form.register("dueDate")} />
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -105,6 +121,7 @@ export default function BorrowForm() {
               Borrow
             </Button>
             <Button
+              className="border-2"
               type="button"
               variant="secondary"
               onClick={() => navigate(-1)}

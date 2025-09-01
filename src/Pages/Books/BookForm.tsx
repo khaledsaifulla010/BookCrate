@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   useCreateBookMutation,
@@ -18,12 +19,13 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import toast from "react-hot-toast";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { Genre } from "../../store/types/book";
+import CenterSpinner from "../../components/ui/spinner";
 
 const schema = z.object({
-  title: z.string().min(1),
-  author: z.string().min(1),
+  title: z.string().min(1, "Title is required"),
+  author: z.string().min(1, "Author is required"),
   genre: z.enum([
     "FICTION",
     "NON_FICTION",
@@ -32,9 +34,9 @@ const schema = z.object({
     "BIOGRAPHY",
     "FANTASY",
   ]),
-  isbn: z.string().min(3),
+  isbn: z.string().min(3, "ISBN is required"),
   description: z.string().optional(),
-  copies: z.coerce.number().int().min(0),
+  copies: z.coerce.number().int().min(0, "Copies cannot be negative"),
   available: z.boolean().optional().default(true),
 });
 
@@ -44,16 +46,17 @@ export default function BookForm({ mode }: { mode: "create" | "edit" }) {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { data: existing, isLoading: loadingBook } = useGetBookQuery(id ?? "", {
-    skip: mode === "create" || !id,
-  });
+  const {
+    data: existing,
+    isLoading,
+    isError,
+  } = useGetBookQuery(id ?? "", { skip: mode !== "edit" || !id });
 
   const [createBook] = useCreateBookMutation();
   const [updateBook] = useUpdateBookMutation();
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
+  const defaults = useMemo<FormValues>(
+    () => ({
       title: "",
       author: "",
       genre: "FICTION",
@@ -61,26 +64,32 @@ export default function BookForm({ mode }: { mode: "create" | "edit" }) {
       description: "",
       copies: 1,
       available: true,
-    },
+    }),
+    []
+  );
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: defaults,
+    shouldUnregister: false,
   });
 
-  // hydrate for edit
   useEffect(() => {
     if (mode === "edit" && existing) {
       form.reset({
-        title: existing.title,
-        author: existing.author,
-        genre: existing.genre as Genre,
-        isbn: existing.isbn,
+        title: existing.title ?? "",
+        author: existing.author ?? "",
+        genre: (existing.genre as Genre) ?? "FICTION",
+        isbn: existing.isbn ?? "",
         description: existing.description ?? "",
-        copies: existing.copies,
-        available: existing.available,
+        copies: typeof existing.copies === "number" ? existing.copies : 0,
+        available:
+          typeof existing.available === "boolean" ? existing.available : true,
       });
     }
-  }, [existing, form, mode]);
+  }, [mode, existing?._id]);
 
   const onSubmit = async (values: FormValues) => {
-    // business rule: if copies = 0, force available=false
     const body = {
       ...values,
       available: values.copies === 0 ? false : values.available ?? true,
@@ -107,14 +116,22 @@ export default function BookForm({ mode }: { mode: "create" | "edit" }) {
         navigate(`/books/${id}`);
       }
     } catch {
-      // handled by toast
+      //
     }
   };
 
-  if (mode === "edit" && loadingBook) return <div>Loading...</div>;
+  if (mode === "edit") {
+    if (isLoading) return <CenterSpinner label="Loading Book..." />;
+    if (isError || !existing)
+      return (
+        <div className="w-full h-[60vh] grid place-items-center">
+          <div className="text-red-600 text-center">Book not found.</div>
+        </div>
+      );
+  }
 
   return (
-    <section className="max-w-2xl space-y-6">
+    <section className="max-w-2xl mx-auto space-y-6 -mt-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">
           {mode === "create" ? "Add Book" : "Edit Book"}
@@ -126,87 +143,137 @@ export default function BookForm({ mode }: { mode: "create" | "edit" }) {
         onSubmit={form.handleSubmit(onSubmit)}
       >
         <div className="grid gap-4 md:grid-cols-2">
+          {/* Title */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Title</label>
-            <Input {...form.register("title")} />
+            <Controller
+              name="title"
+              control={form.control}
+              render={({ field }) => <Input {...field} />}
+            />
             <p className="text-xs text-destructive">
               {form.formState.errors.title?.message}
             </p>
           </div>
+
+          {/* Author */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Author</label>
-            <Input {...form.register("author")} />
+            <Controller
+              name="author"
+              control={form.control}
+              render={({ field }) => <Input {...field} />}
+            />
             <p className="text-xs text-destructive">
               {form.formState.errors.author?.message}
             </p>
           </div>
+
+          {/* Genre */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Genre</label>
-            <Select
-              value={form.watch("genre")}
-              onValueChange={(v) => form.setValue("genre", v as Genre)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select genre" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="FICTION">Fiction</SelectItem>
-                <SelectItem value="NON_FICTION">Non-fiction</SelectItem>
-                <SelectItem value="SCIENCE">Science</SelectItem>
-                <SelectItem value="HISTORY">History</SelectItem>
-                <SelectItem value="BIOGRAPHY">Biography</SelectItem>
-                <SelectItem value="FANTASY">Fantasy</SelectItem>
-              </SelectContent>
-            </Select>
+            <Controller
+              name="genre"
+              control={form.control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select genre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FICTION">Fiction</SelectItem>
+                    <SelectItem value="NON_FICTION">Non-fiction</SelectItem>
+                    <SelectItem value="SCIENCE">Science</SelectItem>
+                    <SelectItem value="HISTORY">History</SelectItem>
+                    <SelectItem value="BIOGRAPHY">Biography</SelectItem>
+                    <SelectItem value="FANTASY">Fantasy</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
             <p className="text-xs text-destructive">
               {form.formState.errors.genre?.message}
             </p>
           </div>
+
+          {/* ISBN */}
           <div className="space-y-2">
             <label className="text-sm font-medium">ISBN</label>
-            <Input {...form.register("isbn")} />
+            <Controller
+              name="isbn"
+              control={form.control}
+              render={({ field }) => <Input {...field} />}
+            />
             <p className="text-xs text-destructive">
               {form.formState.errors.isbn?.message}
             </p>
           </div>
         </div>
 
+        {/* Description */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Description</label>
-          <Textarea rows={4} {...form.register("description")} />
+          <Controller
+            name="description"
+            control={form.control}
+            render={({ field }) => <Textarea rows={4} {...field} />}
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
+          {/* Copies */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Copies</label>
-            <Input
-              type="number"
-              min={0}
-              {...form.register("copies", { valueAsNumber: true })}
+            <Controller
+              name="copies"
+              control={form.control}
+              render={({ field }) => (
+                <Input
+                  type="number"
+                  min={0}
+                  value={
+                    Number.isFinite(field.value as unknown as number)
+                      ? field.value
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    field.onChange(val === "" ? "" : Number(val));
+                  }}
+                />
+              )}
             />
             <p className="text-xs text-destructive">
               {form.formState.errors.copies?.message}
             </p>
           </div>
+
+          {/* Available */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Available</label>
-            <Select
-              value={String(form.watch("available"))}
-              onValueChange={(v) => form.setValue("available", v === "true")}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">True</SelectItem>
-                <SelectItem value="false">False</SelectItem>
-              </SelectContent>
-            </Select>
+            <Controller
+              name="available"
+              control={form.control}
+              render={({ field }) => (
+                <Select
+                  value={String(field.value)}
+                  onValueChange={(v) => field.onChange(v === "true")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">True</SelectItem>
+                    <SelectItem value="false">False</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </div>
         </div>
 
         <div className="flex gap-2">
-          <Button type="submit">
+          <Button type="submit" disabled={form.formState.isSubmitting}>
             {mode === "create" ? "Create Book" : "Save Changes"}
           </Button>
           <Button

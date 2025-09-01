@@ -19,7 +19,15 @@ import {
 
 import { useState, useMemo } from "react";
 import type { Genre } from "../../store/types/book";
-import { ArrowUpDown, Plus, Trash2, Pencil, Eye, Hand } from "lucide-react";
+import {
+  ArrowUpDown,
+  Plus,
+  Trash2,
+  Pencil,
+  Eye,
+  Hand,
+  Search,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 import {
@@ -41,6 +49,7 @@ import {
 
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
+import CenterSpinner from "../../components/ui/spinner";
 
 export default function BooksList() {
   const [genre, setGenre] = useState<Genre | "ALL">("ALL");
@@ -77,8 +86,17 @@ export default function BooksList() {
     );
   }, [data, search]);
 
-  if (isLoading) return <div>Loading books...</div>;
-  if (isError) return <div className="text-red-600">Failed to load books.</div>;
+   if (isLoading) return <CenterSpinner label="Loading Books..." />;
+   if (isError)
+     return (
+       <div className="w-full h-[60vh] grid place-items-center">
+         <div className="text-red-600 text-center">Failed to load books.</div>
+       </div>
+     );
+
+
+  const total = data.length;
+  const availableCount = data.filter((b) => b.available && b.copies > 0).length;
 
   const doDelete = async (id: string) => {
     const p = deleteBook(id).unwrap();
@@ -97,15 +115,31 @@ export default function BooksList() {
   return (
     <section className="space-y-5">
       <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-        <div className="text-2xl font-semibold">Books</div>
-        <div className="flex flex-1 md:flex-none gap-2">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-center md:text-left">
+            Books
+          </h1>
+          <div className="text-xs text-muted-foreground text-center md:text-left">
+            <span className="mr-3">
+              Total: <span className="font-medium">{total}</span>
+            </span>
+            <span>
+              Available: <span className="font-medium">{availableCount}</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-1 md:flex-none flex-wrap gap-2 justify-center md:justify-end">
           {/* Search */}
-          <Input
-            placeholder="Search by title, author, ISBN"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="md:w-72"
-          />
+          <div className="relative md:w-72 w-full">
+            <Input
+              placeholder="Search by title, author, ISBN"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          </div>
 
           {/* Genre Filter */}
           <Select
@@ -175,44 +209,62 @@ export default function BooksList() {
         </div>
       </div>
 
-      {/* Books Table */}
-      <div className="rounded-lg border bg-card">
+      {/* Table */}
+      <div className="rounded-xl border bg-card shadow-sm">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-[1] bg-card">
             <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Author</TableHead>
-              <TableHead>Genre</TableHead>
-              <TableHead>ISBN</TableHead>
-              <TableHead>Copies</TableHead>
-              <TableHead>Availability</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[72px] text-center">SL/No</TableHead>
+              <TableHead className="text-center">Title</TableHead>
+              <TableHead className="text-center">Author</TableHead>
+              <TableHead className="text-center">Genre</TableHead>
+              <TableHead className="text-center">ISBN</TableHead>
+              <TableHead className="text-center">Copies</TableHead>
+              <TableHead className="text-center">Availability</TableHead>
+              <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((b) => (
-              <TableRow key={b._id}>
-                <TableCell className="font-medium">{b.title}</TableCell>
-                <TableCell>{b.author}</TableCell>
-                <TableCell>{b.genre.replace("_", " ")}</TableCell>
-                <TableCell>{b.isbn}</TableCell>
-                <TableCell>{b.copies}</TableCell>
-                <TableCell>
+            {filtered.map((b, idx) => (
+              <TableRow key={b._id} className="hover:bg-muted/40">
+                <TableCell className="font-medium text-center">
+                  {idx + 1}
+                </TableCell>
+                <TableCell className="font-medium text-center">
+                  {b.title}
+                </TableCell>
+                <TableCell className="text-center">{b.author}</TableCell>
+                <TableCell className="uppercase tracking-wide text-xs text-center">
+                  {b.genre.replace("_", " ")}
+                </TableCell>
+                <TableCell className="text-center">{b.isbn}</TableCell>
+                <TableCell className="text-center">{b.copies}</TableCell>
+                <TableCell className="text-center">
                   {b.available && b.copies > 0 ? (
-                    <Badge className="bg-green-600/90">Available</Badge>
+                    <Badge className="bg-emerald-600/90">Available</Badge>
                   ) : (
                     <Badge variant="destructive">Unavailable</Badge>
                   )}
                 </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
+                <TableCell className="text-center">
+                  <div className="flex justify-center gap-1.5">
                     <Link to={`/books/${b._id}`}>
-                      <Button variant="ghost" size="icon" title="View">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="View"
+                        className="hover:bg-secondary/70"
+                      >
                         <Eye size={18} />
                       </Button>
                     </Link>
                     <Link to={`/edit-book/${b._id}`}>
-                      <Button variant="ghost" size="icon" title="Edit">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Edit"
+                        className="hover:bg-secondary/70"
+                      >
                         <Pencil size={18} />
                       </Button>
                     </Link>
@@ -222,6 +274,7 @@ export default function BooksList() {
                         size="icon"
                         title="Borrow"
                         disabled={!b.available || b.copies === 0}
+                        className="hover:bg-secondary/80"
                       >
                         <Hand size={18} />
                       </Button>
@@ -234,7 +287,7 @@ export default function BooksList() {
                           <Trash2 size={18} />
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-lg border bg-card p-6 max-w-sm">
+                      <AlertDialogContent className="rounded-xl border bg-card p-6 max-w-sm">
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete this book?</AlertDialogTitle>
                           <AlertDialogDescription>
@@ -263,7 +316,7 @@ export default function BooksList() {
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="text-center text-muted-foreground py-10"
                 >
                   No books found.
